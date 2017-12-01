@@ -55,8 +55,8 @@ class CaffeModel(ModelWrapper):
 # Define class of simple Tensorflow models.
 # These are intended for simple binary classification tasks.
 class TensorflowSimpleModel(ModelWrapper):
-    def __init__(self, model_name=None, model_path=None):
-        self.model_name = model_name
+    def __init__(self, model_fn, model_path=None):
+        self.model_fn = model_fn
         self.model_path = model_path
         self.model = None
         # Start session and construct graph.
@@ -65,7 +65,6 @@ class TensorflowSimpleModel(ModelWrapper):
         self.input_tensor = tf.placeholder(tf.float32, shape=[None, 1024])
         self.label_tensor = tf.placeholder(tf.float32, shape=[None])
         self.ex_weight_tensor = tf.placeholder(tf.float32, shape=[None])
-        model_fn = get_simple_tf_model_by_name(self.model_name)
         self.loss, self.classes, self.probabilities, self.accuracy = model_fn(
             self.input_tensor, self.label_tensor, self.ex_weight_tensor)
         self.sess.run(self.init_op)
@@ -84,7 +83,7 @@ class TensorflowSimpleModel(ModelWrapper):
 
     def reset(self):
         tf.reset_default_graph()
-        self.__init__(self.model_name, self.model_path)
+        self.__init__(self.model_fn, self.model_path)
 
     def save_model(self, paths):
         pass
@@ -142,25 +141,31 @@ class TensorflowSimpleModel(ModelWrapper):
         save_path = self.saver.save(self.sess, self.model_path)
         print("Model saved in file: %s" % save_path)
 
-def simple_classifier(inputs, labels, ex_weights):
-    onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=2)
-    onehot_labels = tf.reshape(onehot_labels, [-1, 2])
-    # Network layers.
-    hidden = tf.layers.dense(inputs=inputs, units=200, activation=tf.nn.relu)
-    single_logits = tf.layers.dense(inputs=hidden, units=1)
-    logits = tf.concat([1 - single_logits, single_logits], axis=1)
-    # Loss.
-    loss = tf.losses.softmax_cross_entropy(
-        onehot_labels=onehot_labels, logits=logits,
-        reduction=tf.losses.Reduction.NONE)
-    loss = tf.multiply(loss, ex_weights)
-    loss = tf.reduce_mean(loss, name="loss")
-    # Outputs.
-    classes = tf.argmax(input=logits, axis=1, name="classes")
-    probabilities = tf.nn.softmax(logits, name="probabilities")
-    accuracy = tf.metrics.accuracy(
-        labels=labels, predictions=classes)
-    return loss, classes, probabilities, accuracy
+def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
+    def model_fn(inputs, labels, ex_weights):
+        onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=2)
+        onehot_labels = tf.reshape(onehot_labels, [-1, 2])
+        # Network layers.
+        hidden = tf.layers.dense(
+            inputs=inputs, units=n_hidden[0], activation=activations[0])
+        for i in range(1, len(n_hidden)):
+            hidden = tf.layers.dense(
+                inputs=hidden, units=n_hidden[i], activation=activations[i])
+        single_logits = tf.layers.dense(inputs=hidden, units=1)
+        logits = tf.concat([1 - single_logits, single_logits], axis=1)
+        # Loss.
+        loss = tf.losses.softmax_cross_entropy(
+            onehot_labels=onehot_labels, logits=logits,
+            reduction=tf.losses.Reduction.NONE)
+        loss = tf.multiply(loss, ex_weights)
+        loss = tf.reduce_mean(loss, name="loss")
+        # Outputs.
+        classes = tf.argmax(input=logits, axis=1, name="classes")
+        probabilities = tf.nn.softmax(logits, name="probabilities")
+        accuracy = tf.metrics.accuracy(
+            labels=labels, predictions=classes)
+        return loss, classes, probabilities, accuracy
+    return model_fn
 
 def get_simple_tf_model_by_name(model_name):
     if model_name == 'simple_classifier':
