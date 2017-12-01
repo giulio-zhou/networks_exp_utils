@@ -70,6 +70,9 @@ class TensorflowSimpleModel(ModelWrapper):
         self.sess.run(self.init_op)
         self.saver = tf.train.Saver()
 
+    def delete(self):
+        tf.reset_default_graph()
+
     def load_model(self):
         self.saver.restore(self.sess, self.model_path)
 
@@ -88,13 +91,12 @@ class TensorflowSimpleModel(ModelWrapper):
     def save_model(self, paths):
         pass
 
-    def train_model(self, X, y, ex_weights=None):
+    def train_model(self, X, y, ex_weights=None, batch_size=256, n_epochs=5):
         if ex_weights is None:
             ex_weights = np.ones([len(y)])
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
         train = optimizer.minimize(self.loss)
-        batch_size = 64
-        num_iter = int(5 * len(y) / batch_size)
+        num_iter = int(n_epochs * len(y) / batch_size)
         y = y.astype(np.int32)
         # Class balance : try to achieve class balance if possible, else tries
         # to fill a batch with the maximum number of minority samples.
