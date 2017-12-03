@@ -91,10 +91,11 @@ class TensorflowSimpleModel(ModelWrapper):
     def save_model(self, paths):
         pass
 
-    def train_model(self, X, y, ex_weights=None, batch_size=256, n_epochs=5):
+    def train_model(self, X, y, ex_weights=None, batch_size=256, n_epochs=5,
+                    optimizer_fn=tf.train.AdamOptimizer, lr=0.001):
         if ex_weights is None:
             ex_weights = np.ones([len(y)])
-        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
+        optimizer = optimizer_fn(learning_rate=lr)
         train = optimizer.minimize(self.loss)
         num_iter = int(n_epochs * len(y) / batch_size)
         y = y.astype(np.int32)
