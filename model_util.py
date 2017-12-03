@@ -149,12 +149,15 @@ def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
         onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=2)
         onehot_labels = tf.reshape(onehot_labels, [-1, 2])
         # Network layers.
-        hidden = tf.layers.dense(
-            inputs=inputs, units=n_hidden[0], activation=activations[0])
-        for i in range(1, len(n_hidden)):
+        if len(n_hidden) == 0:
+            single_logits = tf.layers.dense(inputs=inputs, units=1)
+        else:
             hidden = tf.layers.dense(
-                inputs=hidden, units=n_hidden[i], activation=activations[i])
-        single_logits = tf.layers.dense(inputs=hidden, units=1)
+                inputs=inputs, units=n_hidden[0], activation=activations[0])
+            for i in range(1, len(n_hidden)):
+                hidden = tf.layers.dense(
+                    inputs=hidden, units=n_hidden[i], activation=activations[i])
+            single_logits = tf.layers.dense(inputs=hidden, units=1)
         logits = tf.concat([1 - single_logits, single_logits], axis=1)
         # Loss.
         loss = tf.losses.softmax_cross_entropy(
