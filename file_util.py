@@ -17,7 +17,7 @@ TRAIN_DATA_PREFIX = 'train'
 TRAIN_FRAMES_PREFIX = 'frames_train'
 TRAIN_LABELS_NAME = 'labels_train'
 
-SHARD_SIZE = 100000
+DEFAULT_SHARD_SIZE = 100000
 
 class Time(object):
     def __init__(self, hour=0, minute=0, second=0):
@@ -30,7 +30,8 @@ class Time(object):
 def convert_to_seconds(time_obj):
     return time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
 
-def write_numpy_array_to_shards(npy_path, data_prefix, output_dir):
+def write_numpy_array_to_shards(npy_path, data_prefix, output_dir,
+                                SHARD_SIZE=DEFAULT_SHARD_SIZE):
     npy_data = np.load(npy_path)
     for i in range(0, len(npy_data) // SHARD_SIZE):
         start_offset = i * SHARD_SIZE
@@ -105,7 +106,8 @@ def make_data_labels(
     np.save('%s/%s.npy' % (output_dir, LABELS_NAME), labels)
 
 # Sharded File reading utilities
-def read_data_range(data_dir, start, end_exclusive):
+def read_data_range(data_dir, start, end_exclusive,
+                    SHARD_SIZE=DEFAULT_SHARD_SIZE):
     # Find the files corresponding to the start and end indices.
     start_file_no = start // SHARD_SIZE
     end_file_no = (end_exclusive - 1) // SHARD_SIZE
@@ -125,7 +127,7 @@ def read_data_time_range(data_dir, start_time, end_time):
     end_frame = int(convert_to_seconds(end_time) * FRAME_RATE)
     return read_data_range(data_dir, start_frame, end_frame + 1)
 
-def get_data_len(data_dir, read_all=False):
+def get_data_len(data_dir, read_all=False, SHARD_SIZE=DEFAULT_SHARD_SIZE):
     data_len = 0
     if read_all:
         filenames = glob.glob('%s/%s_*.npy' % (data_dir, DATA_PREFIX))
@@ -139,7 +141,8 @@ def get_data_len(data_dir, read_all=False):
     return data_len
 
 # Sharded file writing utilities
-def write_indices_to_new_dir(data_dir, output_dir, indices):
+def write_indices_to_new_dir(data_dir, output_dir, indices,
+                             SHARD_SIZE=DEFAULT_SHARD_SIZE):
     f_iter = ShardedFileIterator(data_dir)
     output_buffer = []
     num_output_shards, curr_idx = 0, 0
@@ -159,11 +162,12 @@ def write_indices_to_new_dir(data_dir, output_dir, indices):
                 np.array(output_buffer).squeeze())
 
 class ShardedFileIterator(object):
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, stride=DEFAULT_SHARD_SIZE):
         self.data_dir = data_dir
         self.file_index = 0
         self.item_index = 0
         self.global_offset = 0
+        self.stride = stride
         self.curr_data = self.load_data(0)
 
     def load_data(self, index):
@@ -173,9 +177,9 @@ class ShardedFileIterator(object):
         return get_data_len(self.data_dir, read_all=read_all)
 
     def get_next_entries(self, num_items):
-        stride = SHARD_SIZE
-        num_strides = num_items // SHARD_SIZE
-        remainder = num_items % SHARD_SIZE
+        stride = self.stride
+        num_strides = num_items // self.stride 
+        remainder = num_items % self.stride
         items = []
         for _ in range(num_strides):
             items.append(self.get_next_entries_helper(stride))
@@ -199,7 +203,7 @@ class ShardedFileIterator(object):
         if index < self.global_offset:
             self.__init__(self.data_dir)
 
-        stride = SHARD_SIZE
+        stride = self.stride
         num_strides = (index - self.global_offset) // stride
         remainder = (index - self.global_offset) % stride
         for i in range(num_strides):
