@@ -55,14 +55,14 @@ class CaffeModel(ModelWrapper):
 # Define class of simple Tensorflow models.
 # These are intended for simple binary classification tasks.
 class TensorflowSimpleModel(ModelWrapper):
-    def __init__(self, model_fn, model_path=None):
+    def __init__(self, model_fn, model_path=None, input_dim=1024):
         self.model_fn = model_fn
         self.model_path = model_path
         self.model = None
         # Start session and construct graph.
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
-        self.input_tensor = tf.placeholder(tf.float32, shape=[None, 1024])
+        self.input_tensor = tf.placeholder(tf.float32, shape=[None, input_dim])
         self.label_tensor = tf.placeholder(tf.float32, shape=[None])
         self.ex_weight_tensor = tf.placeholder(tf.float32, shape=[None])
         self.loss, self.classes, self.probabilities, self.accuracy = model_fn(
