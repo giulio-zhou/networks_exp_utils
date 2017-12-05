@@ -162,12 +162,14 @@ def write_indices_to_new_dir(data_dir, output_dir, indices,
                 np.array(output_buffer).squeeze())
 
 class ShardedFileIterator(object):
-    def __init__(self, data_dir, stride=DEFAULT_SHARD_SIZE):
+    def __init__(self, data_dir, stride=DEFAULT_SHARD_SIZE,
+                 data_preprocessing_fn=lambda x: x):
         self.data_dir = data_dir
         self.file_index = 0
         self.item_index = 0
         self.global_offset = 0
         self.stride = stride
+        self.data_preprocessing_fn = data_preprocessing_fn
         self.curr_data = self.load_data(0)
 
     def load_data(self, index):
@@ -183,7 +185,8 @@ class ShardedFileIterator(object):
         items = []
         for _ in range(num_strides):
             items.append(self.get_next_entries_helper(stride))
-        items.append(self.get_next_entries_helper(remainder))
+        if remainder > 0:
+            items.append(self.get_next_entries_helper(remainder))
         return np.vstack(items)
 
     def get_next_entries_helper(self, num_items):
@@ -197,6 +200,8 @@ class ShardedFileIterator(object):
             entries = self.curr_data[self.item_index:self.item_index+num_items]
             self.item_index += num_items
         self.global_offset += num_items
+        # Apply preprocessing to data if applicable.
+        entries = self.data_preprocessing_fn(entries)
         return entries
 
     def seek(self, index):
@@ -208,7 +213,8 @@ class ShardedFileIterator(object):
         remainder = (index - self.global_offset) % stride
         for i in range(num_strides):
             self.get_next_entries(stride)
-        self.get_next_entries(remainder)
+        if remainder > 0:
+            self.get_next_entries(remainder)
         self.global_offset = index
 
 class LabelIterator(object):
