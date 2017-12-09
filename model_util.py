@@ -48,7 +48,7 @@ class TensorflowSimpleModel(ModelWrapper):
 
     def reset(self):
         tf.reset_default_graph()
-        self.__init__(self.model_fn, self.model_path)
+        self.__init__(self.model_fn, self.model_path, self.input_dim)
 
     def save_model(self, paths):
         pass
