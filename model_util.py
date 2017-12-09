@@ -21,6 +21,7 @@ class TensorflowSimpleModel(ModelWrapper):
         self.model_fn = model_fn
         self.model_path = model_path
         self.model = None
+        self.input_dim = input_dim
         # Start session and construct graph.
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
