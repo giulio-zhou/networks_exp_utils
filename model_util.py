@@ -112,6 +112,8 @@ class TensorflowSimpleModel(ModelWrapper):
         # NOTE: Number of classes currently hardcoded to 2.
         pos_idx = np.where(y == 1)[0]
         neg_idx = np.where(y == 0)[0]
+        alpha_pos = ex_weights[pos_idx] / np.sum(ex_weights[pos_idx])
+        alpha_neg = ex_weights[neg_idx] / np.sum(ex_weights[neg_idx])
         batch_num_pos = int(class_balance[1] * batch_size)
         batch_num_neg = batch_size - batch_num_pos
         self.sess.run(tf.local_variables_initializer())
@@ -119,26 +121,27 @@ class TensorflowSimpleModel(ModelWrapper):
         for i in range(num_iter):
             # Create balanced input batches.
             if batch_num_pos == 0:
-                idx = np.random.choice(neg_idx, batch_num_neg, replace=False)
+                idx = np.random.choice(
+                    neg_idx, batch_num_neg, replace=False, p=alpha_neg)
                 X_feed, y_feed = X[idx], y[idx]
                 alpha_feed = ex_weights[idx]
             elif batch_num_neg == 0:
-                idx = np.random.choice(pos_idx, batch_num_pos, replace=False)
+                idx = np.random.choice(
+                    pos_idx, batch_num_pos, replace=False, p=alpha_pos)
                 X_feed, y_feed = X[idx], y[idx]
                 alpha_feed = ex_weights[idx]
             else:
-                pos_ex_idx = \
-                    np.random.choice(pos_idx, batch_num_pos, replace=False)
-                neg_ex_idx = \
-                    np.random.choice(neg_idx, batch_num_neg, replace=False)
+                pos_ex_idx = np.random.choice(
+                    pos_idx, batch_num_pos, replace=False, p=alpha_pos)
+                neg_ex_idx = np.random.choice(
+                    neg_idx, batch_num_neg, replace=False, p=alpha_neg)
                 all_idx = np.hstack([neg_ex_idx, pos_ex_idx])
                 X_feed, y_feed = X[all_idx], y[all_idx]
-                alpha_feed = ex_weights[all_idx]
             _, loss, accuracy = \
                 self.sess.run([train, self.loss, self.accuracy],
                               feed_dict={self.input_tensor: X_feed,
                                          self.label_tensor: y_feed,
-                                         self.ex_weight_tensor: alpha_feed})
+                                         self.ex_weight_tensor: np.ones(len(y_feed))})
             if i % 1 == 0:
                 print("@{} - loss: {}, accuracy: {}".format(i, loss, accuracy))
         save_path = self.saver.save(self.sess, self.model_path)
