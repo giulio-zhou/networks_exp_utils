@@ -25,7 +25,7 @@ class TensorflowSimpleModel(ModelWrapper):
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.input_tensor = tf.placeholder(tf.float32, shape=[None, input_dim])
-        self.label_tensor = tf.placeholder(tf.float32, shape=[None])
+        self.label_tensor = tf.placeholder(tf.int64, shape=[None])
         self.ex_weight_tensor = tf.placeholder(tf.float32, shape=[None])
         self.loss, self.classes, self.probabilities, self.accuracy = model_fn(
             self.input_tensor, self.label_tensor, self.ex_weight_tensor)
@@ -133,7 +133,7 @@ def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
         # Outputs.
         classes = tf.argmax(input=logits, axis=1, name="classes")
         probabilities = tf.nn.softmax(logits, name="probabilities")
-        accuracy = tf.metrics.accuracy(
+        accuracy = tf.contrib.metrics.accuracy(
             labels=labels, predictions=classes)
         return loss, classes, probabilities, accuracy
     return model_fn
