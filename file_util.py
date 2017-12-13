@@ -226,6 +226,9 @@ class LabelIterator(object):
     def load_labels(self):
         return np.load('%s/%s.npy' % (self.data_dir, LABELS_NAME))
 
+    def get_data_len(self):
+        return len(self.labels)
+
     def get_next_entries(self, num_items):
         entries = self.labels[self.item_index:self.item_index + num_items]
         self.item_index += num_items
