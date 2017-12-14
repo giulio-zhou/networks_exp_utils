@@ -174,17 +174,17 @@ def run_pairwise_dists(
         sess, X_tensor, Z_tensor, norm_tensor, max_norm_batch_size, X, Z):
     # Compute the pairwise Euclidean norm between X and Z in chunks to ensure
     # that this will fit into GPU memory.
-    num_full_norm_batches = len(X) // self.max_norm_batch_size
-    norm_batch_remainder = len(X) % self.max_norm_batch_size
+    num_full_norm_batches = len(X) // max_norm_batch_size
+    norm_batch_remainder = len(X) % max_norm_batch_size
     norms = []
     for k in range(num_full_norm_batches):
         X_slice = X[k*max_norm_batch_size:(k+1)*max_norm_batch_size]
-        norm_slice = self.sess.run(
+        norm_slice = sess.run(
             norm_tensor, feed_dict={X_tensor: X_slice, Z_tensor: Z})
         norms.append(norm_slice)
     if norm_batch_remainder > 0:
         X_slice = X[-norm_batch_remainder:]
-        norm_slice = self.sess.run(
+        norm_slice = sess.run(
             norm_tensor, feed_dict={X_tensor: X_slice, Z_tensor: Z})
         norms.append(norm_slice)
     composite_norm_npy = np.hstack(norms)
@@ -213,7 +213,7 @@ class SimpleKNNModel(ModelWrapper):
         self.top_k_vals_tensor = -self.top_k_vals_tensor
         self.sess.run(self.init_op)
 
-    def predict_float(self, X):
+    def predict_floats(self, X):
         if (self.train_data is None) or (self.train_labels is None):
             raise Exception("Train data and labels have not been instantiated")
         composite_norm_npy = run_pairwise_dists(
@@ -254,7 +254,7 @@ class GaussianKernelNearestNeighborModel(ModelWrapper):
             tf.exp(-tf.square(self.norm_tensor_placeholder) / bandwidth)
         self.sess.run(self.init_op)
 
-    def predict_float(self, X):
+    def predict_floats(self, X):
         if (self.train_data is None) or (self.train_labels is None):
             raise Exception("Train data and labels have not been instantiated")
         composite_norm_npy = run_pairwise_dists(
