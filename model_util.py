@@ -146,3 +146,81 @@ def get_simple_tf_model_by_name(model_name):
         print("No valid model named %s" % model_name)
         exit(1)
     return model_fn
+
+# Nearest Neighbor Models.
+def compute_pairwise_dists(X, Z):
+    """
+    Inputs are X (N x d) and Z (M x k).
+    Computes the pairwise euclidean distances between X and Z, and returns
+    an (N x M) distance matrix D.
+    Implementation: Computing the matrix of cross-pairwise distances is
+    equivalent to X**2 - 2 * X Z_T + Z**2
+    """
+    num_X = tf.shape(X)[0]
+    num_Z = tf.shape(Z)[0]
+    X_squared_norm = tf.square(tf.norm(X, axis=1))
+    Z_squared_norm = tf.square(tf.norm(Z, axis=1))
+    cross_terms = tf.matmul(X, tf.transpose(Z))
+    D = tf.add(-2 * cross_terms, Z_squared_norm)
+    D = tf.add(X_squared_norm, tf.transpose(D))
+    D = tf.sqrt(tf.transpose(D))
+    return D
+
+class SimpleKNNModel(ModelWraper):
+    def __init__(self, k, prediction_thresh, max_norm_batch_size=10000):
+        self.k = k
+        self.prediction_thresh = prediction_thresh
+        self.train_data = None
+        self.train_labels = None
+        self.max_norm_batch_size = max_norm_batch_size
+        self.init_op = tf.global_variables_initializer()
+        self.sess = tf.Session()
+        self.training_set_tensor = \
+            tf.placeholder(tf.float32, shape=[None, None])
+        self.test_set_tensor = tf.placeholder(tf.float32, shape=[None, None])
+        self.norm_tensor = compute_pairwise_dists(self.training_set_tensor,
+                                                  self.test_set_tensor)
+        self.norm_tensor_placeholder = \
+            tf.placeholder(tf.float32, shape=[None, None])
+        self.top_k_vals_tensor, self.top_k_idx_tensor = \
+            tf.nn.top_k(-norm_tensor_placeholder, k)
+        self.sess.run(init_op)
+
+    def predict_float(self, X):
+        if (self.train_data is None) or (self.train_labels is None):
+            raise Exception("Train data and labels have not been instantiated")
+        num_full_norm_batches = \
+            len(self.train_data) // self.max_norm_batch_size
+        norm_batch_remainder = \
+            len(self.train_data) % self.max_norm_batch_size
+        norms = []
+        for k in range(num_full_norm_batches):
+            training_set_slice = self.train_data[k*max_norm_batch_size:
+                                                 (k+1)*max_norm_batch_size]
+            norm_slice = self.sess.run(
+                norm_tensor,
+                feed_dict={self.training_set_tensor: training_set_slice,
+                           self.test_set_tensor: X})
+            norms.append(norm_slice)
+        if norm_batch_remainder > 0:
+            training_set_slice = self.train_data[-norm_batch_remainder:]
+            norm_slice = self.sess.run(
+                norm_tensor,
+                feed_dict={self.training_set_tensor: training_set_slice,
+                           self.test_set_tensor: X})
+            norms.append(norm_slice)
+        composite_norm_npy = np.hstack(norms)
+        top_k_idx = self.sess.run(
+            self.top_k_idx_tensor,
+            feed_dict={self.norm_tensor_placeholder: composite_norm_npy})
+        predictions = []
+        for j, top_k_row_idx in enumerate(top_k_idx):
+            top_k_nn_labels = self.train_labels[top_k_row_idx]
+            pred = \
+                1 if np.sum(top_k_nn_labels) >= self.prediction_thresh else 0
+            predictions.append(pred)
+        return predictions
+
+    def train_model(self, X, y):
+        self.train_data = X
+        self.train_labels = y
