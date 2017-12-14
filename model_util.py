@@ -203,7 +203,8 @@ class SimpleKNNModel(ModelWraper):
         self.norm_tensor_placeholder = \
             tf.placeholder(tf.float32, shape=[None, None])
         self.top_k_vals_tensor, self.top_k_idx_tensor = \
-            tf.nn.top_k(-norm_tensor_placeholder, k)
+            tf.nn.top_k(-self.norm_tensor_placeholder, k)
+        self.top_k_vals_tensor = -self.top_k_vals_tensor
         self.sess.run(init_op)
 
     def predict_float(self, X):
@@ -220,6 +221,45 @@ class SimpleKNNModel(ModelWraper):
             top_k_nn_labels = self.train_labels[top_k_row_idx]
             pred = \
                 1 if np.sum(top_k_nn_labels) >= self.prediction_thresh else 0
+            predictions.append(pred)
+        return predictions
+
+    def train_model(self, X, y):
+        self.train_data = X
+        self.train_labels = y
+
+class GaussianKernelNearestNeighborModel(ModelWraper):
+    def __init__(self, bandwidth, max_norm_batch_size=10000):
+        self.bandwidth = bandwidth
+        self.train_data = None
+        self.train_labels = None
+        self.max_norm_batch_size = max_norm_batch_size
+        self.init_op = tf.global_variables_initializer()
+        self.sess = tf.Session()
+        self.training_set_tensor = \
+            tf.placeholder(tf.float32, shape=[None, None])
+        self.test_set_tensor = tf.placeholder(tf.float32, shape=[None, None])
+        self.norm_tensor = compute_pairwise_dists(self.training_set_tensor,
+                                                  self.test_set_tensor)
+        self.norm_tensor_placeholder = \
+            tf.placeholder(tf.float32, shape=[None, None])
+        self.gaussian_kernel_tensor = \
+            tf.exp(-tf.square(self.norm_tensor_placeholder) / bandwidth)
+        self.sess.run(init_op)
+
+    def predict_float(self, X):
+        if (self.train_data is None) or (self.train_labels is None):
+            raise Exception("Train data and labels have not been instantiated")
+        composite_norm_npy = run_pairwise_dists(
+            self.sess, self.training_set_tensor, self.test_set_tensor,
+            self.norm_tensor, self.max_norm_batch_size, self.train_data, X)
+        kernel_weights = self.sess.run(
+            self.gaussian_kernel_tensor,
+            feed_dict={self.norm_tensor_placeholder: composite_norm_npy})
+        predictions = []
+        for j, ex_weights in enumerate(kernel_weights):
+            y_hat = ex_weights * self.train_labels
+            pred = 1 if y_hat > 0.5 else 0
             predictions.append(pred)
         return predictions
 
