@@ -187,7 +187,7 @@ def run_pairwise_dists(
         norm_slice = sess.run(
             norm_tensor, feed_dict={X_tensor: X_slice, Z_tensor: Z})
         norms.append(norm_slice)
-    composite_norm_npy = np.hstack(norms)
+    composite_norm_npy = np.vstack(norms)
     return composite_norm_npy
 
 class SimpleKNNModel(ModelWrapper):
@@ -226,7 +226,7 @@ class SimpleKNNModel(ModelWrapper):
         for j, top_k_row_idx in enumerate(top_k_idx):
             top_k_nn_labels = self.train_labels[top_k_row_idx]
             pred = \
-                1 if np.sum(top_k_nn_labels) >= self.prediction_thresh else 0
+                1 if np.mean(top_k_nn_labels) >= self.prediction_thresh else 0
             predictions.append(pred)
         return predictions
 
