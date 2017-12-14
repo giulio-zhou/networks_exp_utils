@@ -17,12 +17,14 @@ class ModelWrapper(object):
 # Define class of simple Tensorflow models.
 # These are intended for simple binary classification tasks.
 class TensorflowSimpleModel(ModelWrapper):
-    def __init__(self, model_fn, model_path=None, input_dim=1024, name=''):
+    def __init__(self, model_fn, model_path=None,
+                 input_dim=1024, name='', save_model=True):
         self.model_fn = model_fn
         self.model_path = model_path
         self.model = None
         self.input_dim = input_dim
         self.name = name
+        self.save_model = save_model
         # Start session and construct graph.
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -108,8 +110,9 @@ class TensorflowSimpleModel(ModelWrapper):
                                          self.ex_weight_tensor: np.ones(len(y_feed))})
             if i % 1 == 0:
                 print("@{} - loss: {}, accuracy: {}".format(i, loss, accuracy))
-        save_path = self.saver.save(self.sess, self.model_path)
-        print("Model saved in file: %s" % save_path)
+        if self.save_model:
+            save_path = self.saver.save(self.sess, self.model_path)
+            print("Model saved in file: %s" % save_path)
 
 def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
     def model_fn(inputs, labels, ex_weights):
@@ -187,8 +190,8 @@ def run_pairwise_dists(
     composite_norm_npy = np.hstack(norms)
     return composite_norm_npy
 
-class SimpleKNNModel(ModelWraper):
-    def __init__(self, name, k, prediction_thresh,
+class SimpleKNNModel(ModelWrapper):
+    def __init__(self, k, prediction_thresh,
                  max_norm_batch_size=10000, name=''):
         self.k = k
         self.prediction_thresh = prediction_thresh
@@ -208,7 +211,7 @@ class SimpleKNNModel(ModelWraper):
         self.top_k_vals_tensor, self.top_k_idx_tensor = \
             tf.nn.top_k(-self.norm_tensor_placeholder, k)
         self.top_k_vals_tensor = -self.top_k_vals_tensor
-        self.sess.run(init_op)
+        self.sess.run(self.init_op)
 
     def predict_float(self, X):
         if (self.train_data is None) or (self.train_labels is None):
@@ -227,11 +230,11 @@ class SimpleKNNModel(ModelWraper):
             predictions.append(pred)
         return predictions
 
-    def train_model(self, X, y):
+    def train_model(self, X, y, batch_size=None, n_epochs=None):
         self.train_data = X
         self.train_labels = y
 
-class GaussianKernelNearestNeighborModel(ModelWraper):
+class GaussianKernelNearestNeighborModel(ModelWrapper):
     def __init__(self, bandwidth, max_norm_batch_size=10000, name=''):
         self.bandwidth = bandwidth
         self.name = name
@@ -249,7 +252,7 @@ class GaussianKernelNearestNeighborModel(ModelWraper):
             tf.placeholder(tf.float32, shape=[None, None])
         self.gaussian_kernel_tensor = \
             tf.exp(-tf.square(self.norm_tensor_placeholder) / bandwidth)
-        self.sess.run(init_op)
+        self.sess.run(self.init_op)
 
     def predict_float(self, X):
         if (self.train_data is None) or (self.train_labels is None):
@@ -267,6 +270,6 @@ class GaussianKernelNearestNeighborModel(ModelWraper):
             predictions.append(pred)
         return predictions
 
-    def train_model(self, X, y):
+    def train_model(self, X, y, batch_size=None, n_epochs=None):
         self.train_data = X
         self.train_labels = y
