@@ -17,11 +17,12 @@ class ModelWrapper(object):
 # Define class of simple Tensorflow models.
 # These are intended for simple binary classification tasks.
 class TensorflowSimpleModel(ModelWrapper):
-    def __init__(self, model_fn, model_path=None, input_dim=1024):
+    def __init__(self, model_fn, model_path=None, input_dim=1024, name=''):
         self.model_fn = model_fn
         self.model_path = model_path
         self.model = None
         self.input_dim = input_dim
+        self.name = name
         # Start session and construct graph.
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -187,9 +188,11 @@ def run_pairwise_dists(
     return composite_norm_npy
 
 class SimpleKNNModel(ModelWraper):
-    def __init__(self, k, prediction_thresh, max_norm_batch_size=10000):
+    def __init__(self, name, k, prediction_thresh,
+                 max_norm_batch_size=10000, name=''):
         self.k = k
         self.prediction_thresh = prediction_thresh
+        self.name = name
         self.train_data = None
         self.train_labels = None
         self.max_norm_batch_size = max_norm_batch_size
@@ -229,8 +232,9 @@ class SimpleKNNModel(ModelWraper):
         self.train_labels = y
 
 class GaussianKernelNearestNeighborModel(ModelWraper):
-    def __init__(self, bandwidth, max_norm_batch_size=10000):
+    def __init__(self, bandwidth, max_norm_batch_size=10000, name=''):
         self.bandwidth = bandwidth
+        self.name = name
         self.train_data = None
         self.train_labels = None
         self.max_norm_batch_size = max_norm_batch_size
