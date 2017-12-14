@@ -166,6 +166,26 @@ def compute_pairwise_dists(X, Z):
     D = tf.sqrt(tf.transpose(D))
     return D
 
+def run_pairwise_dists(
+        sess, X_tensor, Z_tensor, norm_tensor, max_norm_batch_size, X, Z):
+    # Compute the pairwise Euclidean norm between X and Z in chunks to ensure
+    # that this will fit into GPU memory.
+    num_full_norm_batches = len(X) // self.max_norm_batch_size
+    norm_batch_remainder = len(X) % self.max_norm_batch_size
+    norms = []
+    for k in range(num_full_norm_batches):
+        X_slice = X[k*max_norm_batch_size:(k+1)*max_norm_batch_size]
+        norm_slice = self.sess.run(
+            norm_tensor, feed_dict={X_tensor: X_slice, Z_tensor: Z})
+        norms.append(norm_slice)
+    if norm_batch_remainder > 0:
+        X_slice = X[-norm_batch_remainder:]
+        norm_slice = self.sess.run(
+            norm_tensor, feed_dict={X_tensor: X_slice, Z_tensor: Z})
+        norms.append(norm_slice)
+    composite_norm_npy = np.hstack(norms)
+    return composite_norm_npy
+
 class SimpleKNNModel(ModelWraper):
     def __init__(self, k, prediction_thresh, max_norm_batch_size=10000):
         self.k = k
@@ -189,27 +209,9 @@ class SimpleKNNModel(ModelWraper):
     def predict_float(self, X):
         if (self.train_data is None) or (self.train_labels is None):
             raise Exception("Train data and labels have not been instantiated")
-        num_full_norm_batches = \
-            len(self.train_data) // self.max_norm_batch_size
-        norm_batch_remainder = \
-            len(self.train_data) % self.max_norm_batch_size
-        norms = []
-        for k in range(num_full_norm_batches):
-            training_set_slice = self.train_data[k*max_norm_batch_size:
-                                                 (k+1)*max_norm_batch_size]
-            norm_slice = self.sess.run(
-                norm_tensor,
-                feed_dict={self.training_set_tensor: training_set_slice,
-                           self.test_set_tensor: X})
-            norms.append(norm_slice)
-        if norm_batch_remainder > 0:
-            training_set_slice = self.train_data[-norm_batch_remainder:]
-            norm_slice = self.sess.run(
-                norm_tensor,
-                feed_dict={self.training_set_tensor: training_set_slice,
-                           self.test_set_tensor: X})
-            norms.append(norm_slice)
-        composite_norm_npy = np.hstack(norms)
+        composite_norm_npy = run_pairwise_dists(
+            self.sess, self.training_set_tensor, self.test_set_tensor,
+            self.norm_tensor, self.max_norm_batch_size, self.train_data, X)
         top_k_idx = self.sess.run(
             self.top_k_idx_tensor,
             feed_dict={self.norm_tensor_placeholder: composite_norm_npy})
