@@ -221,7 +221,7 @@ class SimpleKNNModel(ModelWrapper):
             self.norm_tensor, self.max_norm_batch_size, self.train_data, X)
         top_k_idx = self.sess.run(
             self.top_k_idx_tensor,
-            feed_dict={self.norm_tensor_placeholder: composite_norm_npy})
+            feed_dict={self.norm_tensor_placeholder: composite_norm_npy.T})
         predictions = []
         for j, top_k_row_idx in enumerate(top_k_idx):
             top_k_nn_labels = self.train_labels[top_k_row_idx]
@@ -262,7 +262,7 @@ class GaussianKernelNearestNeighborModel(ModelWrapper):
             self.norm_tensor, self.max_norm_batch_size, self.train_data, X)
         kernel_weights = self.sess.run(
             self.gaussian_kernel_tensor,
-            feed_dict={self.norm_tensor_placeholder: composite_norm_npy})
+            feed_dict={self.norm_tensor_placeholder: composite_norm_npy.T})
         predictions = []
         for j, ex_weights in enumerate(kernel_weights):
             y_hat = ex_weights * self.train_labels
