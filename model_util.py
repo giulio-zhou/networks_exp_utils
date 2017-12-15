@@ -265,7 +265,7 @@ class GaussianKernelNearestNeighborModel(ModelWrapper):
             feed_dict={self.norm_tensor_placeholder: composite_norm_npy.T})
         predictions = []
         for j, ex_weights in enumerate(kernel_weights):
-            y_hat = ex_weights * self.train_labels
+            y_hat = np.sum(ex_weights * self.train_labels)
             pred = 1 if y_hat > 0.5 else 0
             predictions.append(pred)
         return predictions
