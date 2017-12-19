@@ -265,6 +265,7 @@ class GaussianKernelNearestNeighborModel(ModelWrapper):
             feed_dict={self.norm_tensor_placeholder: composite_norm_npy.T})
         predictions = []
         for j, ex_weights in enumerate(kernel_weights):
+            ex_weights /= np.sum(ex_weights)
             y_hat = np.sum(ex_weights * self.train_labels)
             pred = 1 if y_hat > 0.5 else 0
             predictions.append(pred)
@@ -273,3 +274,14 @@ class GaussianKernelNearestNeighborModel(ModelWrapper):
     def train_model(self, X, y, batch_size=None, n_epochs=None):
         self.train_data = X
         self.train_labels = y
+
+class SklearnModel(ModelWrapper):
+    def __init__(self, model, name=''):
+        self.model = model
+        self.name = name
+
+    def predict_floats(self, X):
+        return self.model.predict(X)
+
+    def train_model(self, X, y, batch_size=None, n_epochs=None):
+        self.model.fit(X, y)
