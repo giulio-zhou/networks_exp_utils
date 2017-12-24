@@ -1,3 +1,4 @@
+import caffe
 import numpy as np
 import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -285,3 +286,41 @@ class SklearnModel(ModelWrapper):
 
     def train_model(self, X, y, batch_size=None, n_epochs=None):
         self.model.fit(X, y)
+
+# Full Tensorflow/Caffe models.
+class CaffeModel(ModelWrapper):
+    def __init__(self, caffe_prototxt_path=None,
+                 caffemodel_path=None, solver_prototxt_path=None):
+        self.caffe_prototxt_path = caffe_prototxt_path
+        self.caffemodel_path = caffemodel_path
+        self.solver_prototxt_path = solver_prototxt_path
+        self.model = None
+
+    def load_model(self):
+        self.model = caffe.Net(
+            self.caffe_prototxt_path, self.caffemodel_path, caffe.TEST)
+
+    def predict_floats(self, X):
+        self.model.blobs['data'].reshape(*X.shape)
+        self.model.blobs['label'].reshape(X.shape[0])
+        self.model.blobs['data'].data[...] = X
+        softmax_outputs = self.model.forward()
+        print(softmax_outputs)
+        softmax_outputs = softmax_outputs['softmax'][:, 1]
+        return softmax_outputs
+
+    def predict_ints(self, X):
+        return self.predict_floats(X)
+
+    def save_model(self, paths):
+        caffemodel_path = paths[0]
+        self.model.save(caffemodel_path)
+
+    def train_model(self, X, y):
+        solver = caffe.AdamSolver(self.solver_prototxt_path)
+        solver.net.blobs['data'].reshape(*X.shape)
+        solver.net.blobs['label'].reshape(X.shape[0])
+        solver.net.blobs['data'].data[...] = X
+        solver.net.blobs['label'].data[...] = y
+        solver.solve()
+        self.model = solver.net
