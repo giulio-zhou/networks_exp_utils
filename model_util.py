@@ -32,7 +32,7 @@ class TensorflowSimpleModel(ModelWrapper):
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.input_tensor = \
-            tf.placeholder(tf.float32, shape=[None] + input_dim)
+            tf.placeholder(tf.float32, shape=[None] + self.input_dim)
         self.label_tensor = tf.placeholder(tf.int64, shape=[None])
         self.ex_weight_tensor = tf.placeholder(tf.float32, shape=[None])
         if flatten_input:
@@ -40,7 +40,7 @@ class TensorflowSimpleModel(ModelWrapper):
         else:
             model_fn_input = self.input_tensor
         self.loss, self.classes, self.probabilities, self.accuracy = model_fn(
-            self.input_tensor, self.label_tensor, self.ex_weight_tensor)
+            model_fn_input, self.label_tensor, self.ex_weight_tensor)
         self.sess.run(self.init_op)
         self.saver = tf.train.Saver()
 
@@ -51,6 +51,9 @@ class TensorflowSimpleModel(ModelWrapper):
         self.saver.restore(self.sess, self.model_path)
 
     def predict_floats(self, X):
+        # Add additional dimensions if X is "under-dimensional".
+        if len(X.shape) == 2:
+            X = X.reshape(X.shape[0], 1, 1, X.shape[1])
         softmax_outputs = self.sess.run(
             'probabilities:0', feed_dict={self.input_tensor: X})
         return softmax_outputs[:, 1]
@@ -69,6 +72,8 @@ class TensorflowSimpleModel(ModelWrapper):
                     optimizer_fn=tf.train.AdamOptimizer, lr=0.001):
         if ex_weights is None:
             ex_weights = np.ones([len(y)])
+        if len(X.shape) == 2:
+            X = X.reshape(X.shape[0], 1, 1, X.shape[1])
         optimizer = optimizer_fn(learning_rate=lr)
         train = optimizer.minimize(self.loss)
         num_iter = int(n_epochs * len(y) / batch_size)
@@ -121,6 +126,9 @@ class TensorflowSimpleModel(ModelWrapper):
         if self.save_model:
             save_path = self.saver.save(self.sess, self.model_path)
             print("Model saved in file: %s" % save_path)
+            model_dir = '/'.join(self.model_path.split('/')[:-1])
+            tf.train.write_graph(self.sess.graph, model_dir, 'model.pbtxt')
+            print("Model graph written to directory: %s" % model_dir)
 
 def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
     def model_fn(inputs, labels, ex_weights):
