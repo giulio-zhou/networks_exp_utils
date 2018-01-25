@@ -18,20 +18,27 @@ class ModelWrapper(object):
 # Define class of simple Tensorflow models.
 # These are intended for simple binary classification tasks.
 class TensorflowSimpleModel(ModelWrapper):
-    def __init__(self, model_fn, model_path=None,
-                 input_dim=1024, name='', save_model=True):
+    def __init__(self, model_fn, model_path=None, input_dim=[1, 1, 1024],
+                 flatten_input=True, name='', save_model=True):
         self.model_fn = model_fn
         self.model_path = model_path
         self.model = None
         self.input_dim = input_dim
         self.name = name
         self.save_model = save_model
+        if type(self.input_dim) != list: # Implied single number
+            self.input_dim = [1, 1, self.input_dim]
         # Start session and construct graph.
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
-        self.input_tensor = tf.placeholder(tf.float32, shape=[None, input_dim])
+        self.input_tensor = \
+            tf.placeholder(tf.float32, shape=[None] + input_dim)
         self.label_tensor = tf.placeholder(tf.int64, shape=[None])
         self.ex_weight_tensor = tf.placeholder(tf.float32, shape=[None])
+        if flatten_input:
+            model_fn_input = tf.layers.flatten(self.input_tensor)
+        else:
+            model_fn_input = self.input_tensor
         self.loss, self.classes, self.probabilities, self.accuracy = model_fn(
             self.input_tensor, self.label_tensor, self.ex_weight_tensor)
         self.sess.run(self.init_op)
@@ -144,9 +151,45 @@ def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
         return loss, classes, probabilities, accuracy
     return model_fn
 
+def simple_cnn_classifier(filter_size=[(3, 3)], filter_strides=[(1, 1)],
+                          filter_number=[64], filter_activations=[tf.nn.relu],
+                          filter_padding=['same'], dense_n_hidden=[200],
+                          dense_activations=[tf.nn.relu]):
+    def model_fn(inputs, labels, ex_weights):
+        onehot_labels = tf.one_hot(indices=tf.cast(labels, tf.int32), depth=2)
+        onehot_labels = tf.reshape(onehot_labels, [-1, 2])
+        # Network layers.
+        conv_outputs = inputs
+        for i in range(len(filter_size)):
+            conv_outputs = tf.layers.conv2d(
+                conv_outputs, filter_number[i], filter_size[i],
+                strides=filter_strides[i], padding=filter_padding[i],
+                activation=filter_activations[i])
+        hidden = conv_outputs
+        for i in range(len(filter_size)):
+            hidden = tf.layers.dense(inputs=hidden, units=dense_n_hidden[i],
+                                     activation=dense_activations[i])
+        single_logits = tf.layers.dense(inputs=hidden, units=1)
+        logits = tf.concat([1 - single_logits, single_logits], axis=1)
+        # Loss.
+        loss = tf.losses.softmax_cross_entropy(
+            onehot_labels=onehot_labels, logits=logits,
+            reduction=tf.losses.Reduction.NONE)
+        loss = tf.multiply(loss, ex_weights)
+        loss = tf.reduce_mean(loss, name="loss")
+        # Outputs.
+        classes = tf.argmax(input=logits, axis=1, name="classes")
+        probabilities = tf.nn.softmax(logits, name="probabilities")
+        accuracy = tf.contrib.metrics.accuracy(
+            labels=labels, predictions=classes)
+        return loss, classes, probabilities, accuracy
+    return model_fn
+
 def get_simple_tf_model_by_name(model_name):
     if model_name == 'simple_classifier':
         model_fn = simple_classifier
+    elif model_name == 'simple_cnn_classifier':
+        model_fn = simple_cnn_classifier
     else:
         print("No valid model named %s" % model_name)
         exit(1)
