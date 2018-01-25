@@ -26,13 +26,14 @@ class TensorflowSimpleModel(ModelWrapper):
         self.input_dim = input_dim
         self.name = name
         self.save_model = save_model
-        if type(self.input_dim) != list: # Implied single number
+        if type(self.input_dim) != list and \
+           type(self.input_dim) != tuple : # Implied single number
             self.input_dim = [1, 1, self.input_dim]
         # Start session and construct graph.
         self.init_op = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.input_tensor = \
-            tf.placeholder(tf.float32, shape=[None] + self.input_dim)
+            tf.placeholder(tf.float32, shape=[None] + list(self.input_dim))
         self.label_tensor = tf.placeholder(tf.int64, shape=[None])
         self.ex_weight_tensor = tf.placeholder(tf.float32, shape=[None])
         if flatten_input:
