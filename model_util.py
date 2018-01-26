@@ -174,8 +174,8 @@ def simple_cnn_classifier(filter_size=[(3, 3)], filter_strides=[(1, 1)],
                 conv_outputs, filter_number[i], filter_size[i],
                 strides=filter_strides[i], padding=filter_padding[i],
                 activation=filter_activations[i])
-        hidden = conv_outputs
-        for i in range(len(filter_size)):
+        hidden = tf.layers.flatten(conv_outputs)
+        for i in range(len(dense_n_hidden)):
             hidden = tf.layers.dense(inputs=hidden, units=dense_n_hidden[i],
                                      activation=dense_activations[i])
         single_logits = tf.layers.dense(inputs=hidden, units=1)
