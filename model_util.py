@@ -122,7 +122,7 @@ class TensorflowSimpleModel(ModelWrapper):
                               feed_dict={self.input_tensor: X_feed,
                                          self.label_tensor: y_feed,
                                          self.ex_weight_tensor: np.ones(len(y_feed))})
-            if i % 1 == 0:
+            if i % 10 == 0:
                 print("@{} - loss: {}, accuracy: {}".format(i, loss, accuracy))
         if self.save_model:
             save_path = self.saver.save(self.sess, self.model_path)
@@ -160,8 +160,9 @@ def simple_classifier(n_hidden=[200], activations=[tf.nn.relu]):
         return loss, classes, probabilities, accuracy
     return model_fn
 
-def simple_cnn_classifier(filter_size=[(3, 3)], filter_strides=[(1, 1)],
-                          filter_number=[64], filter_activations=[tf.nn.relu],
+def simple_cnn_classifier(filter_layers=[tf.layers.conv2d], filter_size=[(3, 3)],
+                          filter_strides=[(1, 1)], filter_number=[64],
+                          filter_activations=[tf.nn.relu],
                           filter_padding=['same'], dense_n_hidden=[200],
                           dense_activations=[tf.nn.relu]):
     def model_fn(inputs, labels, ex_weights):
@@ -169,8 +170,8 @@ def simple_cnn_classifier(filter_size=[(3, 3)], filter_strides=[(1, 1)],
         onehot_labels = tf.reshape(onehot_labels, [-1, 2])
         # Network layers.
         conv_outputs = inputs
-        for i in range(len(filter_size)):
-            conv_outputs = tf.layers.conv2d(
+        for i, conv_layer in enumerate(filter_layers):
+            conv_outputs = conv_layer(
                 conv_outputs, filter_number[i], filter_size[i],
                 strides=filter_strides[i], padding=filter_padding[i],
                 activation=filter_activations[i])
