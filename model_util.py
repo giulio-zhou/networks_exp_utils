@@ -103,11 +103,13 @@ class TensorflowSimpleModel(ModelWrapper):
             if batch_num_pos == 0:
                 idx = np.random.choice(
                     neg_idx, batch_num_neg, replace=False, p=alpha_neg)
+                idx = sorted(idx)
                 X_feed, y_feed = X[idx], y[idx]
                 alpha_feed = ex_weights[idx]
             elif batch_num_neg == 0:
                 idx = np.random.choice(
                     pos_idx, batch_num_pos, replace=False, p=alpha_pos)
+                idx = sorted(idx)
                 X_feed, y_feed = X[idx], y[idx]
                 alpha_feed = ex_weights[idx]
             else:
@@ -116,6 +118,7 @@ class TensorflowSimpleModel(ModelWrapper):
                 neg_ex_idx = np.random.choice(
                     neg_idx, batch_num_neg, replace=False, p=alpha_neg)
                 all_idx = np.hstack([neg_ex_idx, pos_ex_idx])
+                all_idx = sorted(all_idx)
                 X_feed, y_feed = X[all_idx], y[all_idx]
             _, loss, accuracy = \
                 self.sess.run([train, self.loss, self.accuracy],
